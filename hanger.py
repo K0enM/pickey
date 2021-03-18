@@ -4,6 +4,10 @@ import busio
 import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 import RPi.GPIO as GPIO
+import http.client as client
+import json
+
+con = client.HTTPConnection('mod7-pickey.herokuapp.com' , 80)
 
 GPIO.setmode(GPIO.BCM)
 
@@ -18,13 +22,26 @@ chan1 = AnalogIn(ads, ADS.P1)
 chan2 = AnalogIn(ads, ADS.P2)
 chan3 = AnalogIn(ads, ADS.P3)
 
+def get_voltages():
+    return {
+            2: chan0.voltage,
+            3: chan1.voltage,
+            4: chan2.voltage,
+            5: chan3.voltage,
+     }
+
 try:
     while True:
-        print("Sensor 0: {:>5.3f}".format(chan0.voltage))
-        print("Sensor 1: {:>5.3f}".format(chan1.voltage))
-        print("Sensor 2: {:>5.3f}".format(chan2.voltage))
-        print("Sensor 3: {:>5.3f}".format(chan3.voltage))
-        sleep(0.1)
+        data = get_voltages()
+        print('Sending voltages...')
+        headers = {'Content-type' : 'application/json'}
+        for key, value in data.items():
+            to_send = { 'weight': value}
+            json_data = json.dumps(to_send)
+            con.request("PUT", "/api/hanger/" + str(key), json_data, headers)  
+            res = con.getresponse()
+            res.read()
+        sleep(2.5)
 except KeyboardInterrupt:
     GPIO.cleanup()
     print("Ending...")
